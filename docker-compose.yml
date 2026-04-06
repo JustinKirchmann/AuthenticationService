@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 5
+
+  kurrentdb:
+    image: kurrentplatform/kurrentdb:latest
+    command: ["--insecure", "--run-projections=All", "--enable-atom-pub-over-http"]
+    environment:
+      - KURRENTDB_CLUSTER_SIZE=1
+    ports:
+      - "2113:2113"
+      - "1113:1113"
+
+  auth-service:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/authdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      KURRENTDB_URL: esdb://kurrentdb:2113?tls=false
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
